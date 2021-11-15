@@ -9,6 +9,10 @@
   "author": "Aksantara",
   "license": "ISC",
   "dependencies": {
+    "@ifrunistuttgart/node-mavlink": "^0.1.2",
+    "dgram": "^1.0.1",
+    "mavlink": "^1.0.1",
+    "node-mavlink": "^1.0.1",
     "serialport": "^9.1.0"
   }
 }

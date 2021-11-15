@@ -1,50 +1,89 @@
 const SerialPort = require("serialport");
+// const findPort = require("./findPort");
+const mavlink = require("mavlink");
+const myMAV = new mavlink(1, 1, "v1.0", ["common", "ardupilotmega"]);
 
-//DETECTING PORT THAT CONNECT TO FC
-let portMetadata;
-let portPath;
+// setTimeout(() => {
+//   //Parsing Port With FC Metadata
+//   const portMetadata = findPort.port;
+//   console.log(portMetadata)
+//   //CONNECTING TO SERIALPORT THAT CONNECT TO FC
+//   const port = new SerialPort(portMetadata.path, {
+//     autoOpen: false,
+//     baudRate: 115200,
+//   });
 
-//Mencari port yang terhubung dengan FC, yaitu port dengan nilai manufacture = 3D Robotics
-const findPortWithFC = async () => {
-  try {
-    let selectedPort;
+//   // Membuka Port
+//   port.open(() => {
+//     console.log(
+//       `Port yang terhubung dengan FC : "${portMetadata.path}" Terbuka!`
+//     );
+//   });
+// }, 3000);
 
-    const ports = await SerialPort.list(); //Mengembalikan promise
+//CONNECTING TO SERIALPORT THAT CONNECT TO FC
+const port = new SerialPort("/dev/ttyACM0", {
+  autoOpen: false,
+  baudRate: 115200,
+});
 
-    ports.forEach((portCandidate) => {
-      if (portCandidate.manufacturer === "3D Robotics") {
-        selectedPort = portCandidate;
-      }
-    });
+port.open(() => {
+  console.log(`Port yang terhubung dengan FC : ${port.path} Terbuka!`);
+});
 
-    if (selectedPort) {
-      return selectedPort;
-    } else {
-      //Mengembalikan pesan jika port dengan FC tidak ditemukan
-      return {
-        message: "Not Found!",
-        note: "Port yang terhubung dengan FC tidak ditemukan!",
-      };
+myMAV.on("ready", function () {
+  myMAV.createMessage(
+    "HEARTBEAT",
+    {
+      type: 6,
+      autopilot: 12,
+      base_mode: 1,
+      custom_mode: 1,
+      system_status: 1,
+      mavlink_version: 3,
+    },
+    function (message) {
+      port.write(message.buffer, () => {
+        console.log("request param");
+      });
     }
-  } catch (err) {
-    console.log("Error:" + err);
-  }
-};
-
-(async () => {
-  //PAKEIN TRY CATCH ENTAR
-
-  portMetadata = await findPortWithFC();
-  portPath = portMetadata.path;
-
-  //CONNECTING TO SERIALPORT THAT CONNECT TO FC
-  const port = new SerialPort(portPath, {
-    autoOpen: false,
-    baudRate: 115200,
+  );
+  
+  //parse incoming serial data
+  port.on("data", function (data) {
+    myMAV.parse(data);
   });
 
-  //Membuka Port
-  port.open(() => {
-    console.log(`Port yang terhubung dengan FC : "${portPath}" Terbuka!`);
+  //listen for messages
+  myMAV.on("HEARTBEAT", function (message) {
+    console.log(message);
   });
-})();
+
+  port.on("message", () => {
+    myMAV.on("HEARTBEAT", function (message, fields) {
+      console.log(fields);
+    });
+  });
+
+  // myMAV.createMessage(
+  //   "PARAM_REQUEST_LIST",
+  //   {
+  //     //Membuat messagenya terlebih dahulu
+  //     target_system: 1,
+  //     target_component: 1,
+  //   },
+  //   function (message) {
+  //     console.log("Requesting all parameters to PX4...");
+  //     //Gunakan mavlink v1 (karena meliputi array of char)
+  //     use_v1 = true;
+  //     setTimeout(() => {
+  //       //Mengirim PARAM_REQUEST_LIST ke PX4
+  //       port.write(message.buffer);
+  //     }, 1000);
+  //     setTimeout(() => {
+  //       //Timeout untuk mematikan parser mavlink v1
+  //       use_v1 = false;
+  //     }, 2000);
+  //   }
+  // );
+});
